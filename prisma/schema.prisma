@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamp(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamp(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt             DateTime  @default(now()) @db.Timestamp(6)
+  user                  user      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "account_userId_user_id_fk")
+}
+
+model amenities {
+  id                 String               @id
+  name               String               @unique(map: "amenities_name_idx")
+  category           amenity_category     @unique(map: "amenities_category_idx")
+  icon               String?
+  is_active          Boolean              @default(true)
+  property_amenities property_amenities[]
+}
+
+model contact_requests {
+  id                       String         @id
+  listing_id               String         @unique(map: "contact_requests_listing_id_idx")
+  user_id                  String?
+  name                     String
+  email                    String
+  phone                    String?
+  message                  String
+  preferred_contact_method contact_method @default(EMAIL)
+  status                   contact_status @unique(map: "contact_requests_status_idx") @default(PENDING)
+  agent_notes              String?
+  created_at               DateTime       @unique(map: "contact_requests_created_at_idx") @default(now())
+  updated_at               DateTime
+  listings                 listings       @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contact_requests_listing_id_listings_id_fk")
+  users                    users?         @relation(fields: [user_id], references: [id], onUpdate: NoAction, map: "contact_requests_user_id_users_id_fk")
+}
+
+model listings {
+  id                     String            @id
+  created_at             DateTime          @default(now())
+  updated_at             DateTime
+  title                  String
+  description            String
+  property_id            String            @unique(map: "listings_property_id_idx")
+  agent_id               String            @unique(map: "listings_agent_id_idx")
+  slug                   String            @unique(map: "listings_slug_idx")
+  listing_type           listing_type      @unique(map: "listings_listing_type_idx")
+  status                 listing_status    @unique(map: "listings_status_idx") @default(DRAFT)
+  price                  Int               @unique(map: "listings_price_idx")
+  currency               String            @default("USD")
+  price_per_square_meter Decimal?          @db.Decimal(10, 2)
+  available_from         DateTime?         @db.Date
+  available_until        DateTime?         @db.Date
+  minimum_rental_period  Int?
+  view_count             Int               @default(0)
+  is_active              Boolean           @default(true)
+  featured_until         DateTime?
+  contact_requests       contact_requests?
+  users                  users             @relation(fields: [agent_id], references: [id], onUpdate: NoAction, map: "listings_agent_id_users_id_fk")
+  properties             properties        @relation(fields: [property_id], references: [id], onUpdate: NoAction, map: "listings_property_id_properties_id_fk")
+  user_favorites         user_favorites[]
+  view_history           view_history?
+}
+
+model locations {
+  id           String     @id
+  property_id  String     @unique(map: "locations_property_id_idx")
+  address      String
+  city         String     @unique(map: "locations_city_idx")
+  state        String?
+  country      String
+  postal_code  String     @unique(map: "locations_postal_code_idx")
+  latitude     Decimal?   @db.Decimal(10, 8)
+  longitude    Decimal?   @db.Decimal(11, 8)
+  neighborhood String?
+  district     String?
+  properties   properties @relation(fields: [property_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "locations_property_id_properties_id_fk")
+}
+
+model properties {
+  id                     String               @id
+  owner_id               String
+  property_type          property_type
+  bedrooms               Int
+  bathrooms              Decimal              @db.Decimal(3, 1)
+  square_meters          Decimal              @db.Decimal(10, 2)
+  lot_size_square_meters Decimal?             @db.Decimal(10, 2)
+  year_built             Int?
+  parking_spaces         Int                  @default(0)
+  has_garage             Boolean              @default(false)
+  condition              property_condition
+  furnished_status       furnished_status     @default(UNFURNISHED)
+  floor_number           Int?
+  total_floors           Int?
+  has_elevator           Boolean              @default(false)
+  pets_allowed           Boolean              @default(false)
+  created_at             DateTime             @default(now())
+  updated_at             DateTime
+  listings               listings?
+  locations              locations?
+  users                  users                @relation(fields: [owner_id], references: [id], onUpdate: NoAction, map: "properties_owner_id_users_id_fk")
+  property_amenities     property_amenities[]
+  property_images        property_images?
+}
+
+model property_amenities {
+  property_id String
+  amenity_id  String
+  amenities   amenities  @relation(fields: [amenity_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "property_amenities_amenity_id_amenities_id_fk")
+  properties  properties @relation(fields: [property_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "property_amenities_property_id_properties_id_fk")
+
+  @@id([property_id, amenity_id], map: "property_amenities_property_id_amenity_id_pk")
+}
+
+model property_images {
+  id          String     @id
+  property_id String     @unique(map: "property_images_property_id_idx")
+  uploaded_by String
+  url         String
+  alt         String?
+  caption     String?
+  is_primary  Boolean    @unique(map: "property_images_is_primary_idx") @default(false)
+  order       Int
+  created_at  DateTime   @default(now())
+  properties  properties @relation(fields: [property_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "property_images_property_id_properties_id_fk")
+  users       users      @relation(fields: [uploaded_by], references: [id], onUpdate: NoAction, map: "property_images_uploaded_by_users_id_fk")
+
+  @@unique([property_id, order], map: "property_images_property_order_idx")
+}
+
+model saved_searches {
+  id              String          @id
+  user_id         String
+  name            String
+  search_query    Json
+  alerts_enabled  Boolean         @default(false)
+  alert_frequency alert_frequency @default(WEEKLY)
+  last_alert_sent DateTime?
+  created_at      DateTime        @default(now())
+  updated_at      DateTime
+  users           users           @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "saved_searches_user_id_users_id_fk")
+}
+
+model session {
+  id        String   @id
+  expiresAt DateTime @db.Timestamp(6)
+  token     String   @unique(map: "session_token_unique")
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @db.Timestamp(6)
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "session_userId_user_id_fk")
+}
+
+model user {
+  id            String    @id
+  name          String
+  email         String    @unique(map: "user_email_unique")
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime  @default(now()) @db.Timestamp(6)
+  account       account[]
+  session       session[]
+}
+
+model user_favorites {
+  user_id    String
+  listing_id String
+  saved_at   DateTime @default(now())
+  listings   listings @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_favorites_listing_id_listings_id_fk")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "user_favorites_user_id_users_id_fk")
+
+  @@id([user_id, listing_id], map: "user_favorites_user_id_listing_id_pk")
+}
+
+model users {
+  id               String             @id
+  email            String             @unique(map: "users_email_unique")
+  first_name       String
+  last_name        String
+  phone            String?
+  role             user_role          @default(USER)
+  is_active        Boolean            @default(true)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  contact_requests contact_requests[]
+  listings         listings?
+  properties       properties[]
+  property_images  property_images[]
+  saved_searches   saved_searches[]
+  user_favorites   user_favorites[]
+  view_history     view_history?
+}
+
+model verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime  @db.Timestamp(6)
+  createdAt  DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model view_history {
+  id                    String       @id
+  listing_id            String       @unique(map: "view_history_listing_id_idx")
+  user_id               String?      @unique(map: "view_history_user_id_idx")
+  session_id            String       @unique(map: "view_history_session_id_idx")
+  viewed_at             DateTime     @unique(map: "view_history_viewed_at_idx") @default(now())
+  view_duration_seconds Int?
+  referrer_url          String?
+  device_type           device_type?
+  listings              listings     @relation(fields: [listing_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "view_history_listing_id_listings_id_fk")
+  users                 users?       @relation(fields: [user_id], references: [id], onUpdate: NoAction, map: "view_history_user_id_users_id_fk")
+}
+
+enum alert_frequency {
+  INSTANT
+  DAILY
+  WEEKLY
+}
+
+enum amenity_category {
+  INTERIOR
+  EXTERIOR
+  BUILDING
+  NEIGHBORHOOD
+}
+
+enum contact_method {
+  EMAIL
+  PHONE
+  WHATSAPP
+}
+
+enum contact_status {
+  PENDING
+  CONTACTED
+  CONVERTED
+  CANCELLED
+}
+
+enum device_type {
+  MOBILE
+  TABLET
+  DESKTOP
+}
+
+enum furnished_status {
+  FURNISHED
+  PARTIALLY_FURNISHED
+  UNFURNISHED
+}
+
+enum listing_status {
+  DRAFT
+  ACTIVE
+  PENDING
+  SOLD
+  RENTED
+  EXPIRED
+  CANCELLED
+}
+
+enum listing_type {
+  SALE
+  RENT
+  BOTH
+}
+
+enum property_condition {
+  NEW
+  EXCELLENT
+  GOOD
+  FAIR
+  NEEDS_RENOVATION
+}
+
+enum property_type {
+  APARTMENT
+  HOUSE
+  CONDO
+  TOWNHOUSE
+  LAND
+  COMMERCIAL
+}
+
+enum user_role {
+  USER
+  AGENT
+  ADMIN
+}
