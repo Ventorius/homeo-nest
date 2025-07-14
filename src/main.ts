@@ -14,11 +14,12 @@ async function bootstrap() {
     }),
   );
 
-  app.register(clerkPlugin, {
+  await app.register(clerkPlugin, {
     secretKey: process.env.CLERK_SECRET_KEY,
     publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
   });
 
   await app.listen(3000, '0.0.0.0');
 }
+
 bootstrap();
